@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
+
 	"remy/internal/config"
 )
 
@@ -20,6 +21,10 @@ func (s *TestSuite) SetupSuite() {
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		s.T().Fatalf("Failed to load config: %v", err)
+	}
+
+	if cfg.DatabaseURL == "" {
+		s.T().Fatal("Database URL is not set in config")
 	}
 
 	db, err := config.SetupDatabase(cfg)
@@ -50,5 +55,9 @@ func clearDatabase(db *gorm.DB) {
 
 	for _, table := range tables {
 		db.Exec("DELETE FROM " + table)
+	}
+
+	for _, table := range tables {
+		db.Exec("DELETE FROM sqlite_sequence WHERE name='" + table + "'")
 	}
 }

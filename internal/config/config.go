@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/joho/godotenv"
@@ -35,8 +36,30 @@ func LoadConfig() (*Config, error) {
 }
 
 func LoadEnv() {
-	godotenv.Load(".env." + getEnv("APP_ENV", "development"))
-	godotenv.Load(".env")
+	root, _ := findProjectRoot()
+	godotenv.Load(filepath.Join(root, ".env."+getEnv("APP_ENV", "development")))
+	godotenv.Load(filepath.Join(root, ".env"))
+}
+
+func findProjectRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	for {
+		if _, err := os.Stat(dir + "/go.mod"); err == nil {
+			return dir, nil
+		}
+
+		parent := dir + "/.."
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	return "", os.ErrNotExist
 }
 
 func getEnv(key string, defaultValue string) string {

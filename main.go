@@ -14,6 +14,7 @@ import (
 
 	"remy/internal/config"
 	"remy/internal/handlers"
+	pubpkg "remy/internal/infrastructure/publisher"
 	"remy/internal/logging"
 	"remy/internal/middlewares"
 	"remy/internal/response"
@@ -129,7 +130,9 @@ func setupRoutes(router *gin.Engine, db *gorm.DB) {
 
 	v1 := router.Group("/api/v1")
 
-	noteService := services.NewNoteService(db)
+	publisher := pubpkg.NewInMemoryPublisher()
+
+	noteService := services.NewNoteService(db, publisher)
 	noteHandler := handlers.NewNoteHandler(noteService)
 
 	v1.POST("/notes", noteHandler.Create)

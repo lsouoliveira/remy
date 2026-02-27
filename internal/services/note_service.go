@@ -9,7 +9,8 @@ import (
 )
 
 type NoteService struct {
-	db *gorm.DB
+	db        *gorm.DB
+	publisher models.DomainEventPublisher
 }
 
 type NoteCreate struct {
@@ -48,16 +49,26 @@ func NewListNotesRequest(page int, pageSize int) ListNotesRequest {
 	}
 }
 
-func NewNoteService(db *gorm.DB) *NoteService {
-	return &NoteService{db: db}
+func NewNoteService(db *gorm.DB, publisher models.DomainEventPublisher) *NoteService {
+	return &NoteService{db: db, publisher: publisher}
 }
 
 func (s *NoteService) Create(request NoteCreate) (*NoteRead, error) {
+	tx := s.db.Begin()
+
 	note := models.CreateNote(request.Content)
 
-	if err := s.db.Create(note).Error; err != nil {
+	if err := tx.Create(note).Error; err != nil {
+		tx.Rollback()
 		return nil, fmt.Errorf("failed to create note: %w", err)
 	}
+
+	if err := s.publisher.Publish(models.NoteCreatedEvent{NoteID: note.ID}); err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("failed to publish note created event: %w", err)
+	}
+
+	tx.Commit()
 
 	return mapToNoteRead(note), nil
 }
