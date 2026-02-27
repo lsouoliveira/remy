@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"remy/internal/helpers"
 	"remy/internal/response"
 	"remy/internal/services"
 )
@@ -14,12 +15,12 @@ type NoteHandler struct {
 }
 
 type CreateNoteRequest struct {
-	Content string `json:"content" binding:"required"`
+	Content *string `json:"content" binding:"required,min=1"`
 }
 
 type NoteListRequest struct {
-	Page     int `form:"page" binding:"omitempty"`
-	PageSize int `form:"page_size" binding:"omitempty"`
+	Page     string `form:"page" binding:"omitempty,min=1"`
+	PageSize string `form:"page_size" binding:"omitempty,min=1"`
 }
 
 func NewNoteHandler(service *services.NoteService) *NoteHandler {
@@ -36,7 +37,7 @@ func (h *NoteHandler) Create(c *gin.Context) {
 	}
 
 	note, err := h.service.Create(services.NoteCreate{
-		Content: req.Content,
+		Content: *req.Content,
 	})
 	if err != nil {
 		c.Error(err)
@@ -55,11 +56,17 @@ func (h *NoteHandler) List(c *gin.Context) {
 		return
 	}
 
-	result, err := h.service.List(services.NewListNotesRequest(req.Page, req.PageSize))
+	var params services.ListNotesParams
+	params = services.ListNotesParams{
+		Page:     helpers.ParseInt(req.Page, 1),
+		PageSize: helpers.ParseInt(req.PageSize, 10),
+	}
+
+	result, err := h.service.List(params)
 	if err != nil {
 		c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusOK, response.NewPaginatedResponse(result.Notes, req.Page, req.PageSize, int(result.Total)))
+	c.JSON(http.StatusOK, response.NewPaginatedResponse(result.Notes, params.Page, params.PageSize, int(result.Total)))
 }

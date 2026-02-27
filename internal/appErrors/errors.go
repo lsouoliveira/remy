@@ -10,8 +10,6 @@ type AppError struct {
 	Message string
 }
 
-var InternalServerError = NewError(500, "internal_server_error", "An unexpected error occurred. Please try again later.")
-
 func NewError(status int, code string, message string) *AppError {
 	return &AppError{
 		Status:  status,

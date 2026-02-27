@@ -29,12 +29,12 @@ type NoteList struct {
 	Total int64
 }
 
-type ListNotesRequest struct {
+type ListNotesParams struct {
 	Page     int
 	PageSize int
 }
 
-func NewListNotesRequest(page int, pageSize int) ListNotesRequest {
+func NewListNotesRequest(page int, pageSize int) ListNotesParams {
 	if page < 1 {
 		page = 1
 	}
@@ -43,7 +43,7 @@ func NewListNotesRequest(page int, pageSize int) ListNotesRequest {
 		pageSize = 10
 	}
 
-	return ListNotesRequest{
+	return ListNotesParams{
 		Page:     page,
 		PageSize: pageSize,
 	}
@@ -73,7 +73,7 @@ func (s *NoteService) Create(request NoteCreate) (*NoteRead, error) {
 	return mapToNoteRead(note), nil
 }
 
-func (s *NoteService) List(params ListNotesRequest) (*NoteList, error) {
+func (s *NoteService) List(params ListNotesParams) (*NoteList, error) {
 	var total int64
 	if err := s.db.Model(&models.Note{}).Count(&total).Error; err != nil {
 		return nil, fmt.Errorf("failed to count notes: %w", err)

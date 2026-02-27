@@ -3,14 +3,24 @@ package middlewares
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/sirupsen/logrus"
 
 	"remy/internal/appErrors"
 	"remy/internal/logging"
 	"remy/internal/response"
 )
+
+var defaultValidationMessage = "Invalid value."
+
+var validatorTagToMessage = map[string]string{
+	"required": "This field is required.",
+	"min":      "Value is too short.",
+	"max":      "Value is too long.",
+}
 
 func GlobalErrorHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -21,9 +31,12 @@ func GlobalErrorHandler() gin.HandlerFunc {
 
 			for _, err := range c.Errors {
 				var appErr *appErrors.AppError
+				var validationErrs validator.ValidationErrors
 
 				if errors.As(err.Err, &appErr) {
 					apiErrors = append(apiErrors, mapAppErrorToAPIError(appErr))
+				} else if errors.As(err.Err, &validationErrs) {
+					apiErrors = append(apiErrors, mapValidationErrorsToAPIErrors(validationErrs)...)
 				} else {
 					logging.Logger.WithFields(logrus.Fields{
 						"error": err.Err.Error(),
@@ -61,4 +74,47 @@ func mapAppErrorToAPIError(appErr *appErrors.AppError) *response.APIError {
 		Title:  http.StatusText(appErr.Status),
 		Detail: appErr.Message,
 	}
+}
+
+func mapValidationErrorsToAPIErrors(validationErrs validator.ValidationErrors) []*response.APIError {
+	var apiErrors []*response.APIError
+
+	for _, fieldErr := range validationErrs {
+		apiErrors = append(apiErrors, &response.APIError{
+			Status: http.StatusBadRequest,
+			Code:   "validation_error",
+			Title:  "Validation Error",
+			Detail: mapValidationTagToMessage(fieldErr.Tag()),
+			Source: &response.Source{
+				Pointer: buildPointerFromNamespace(fieldErr.Namespace()),
+			},
+		})
+	}
+
+	return apiErrors
+}
+
+func mapValidationTagToMessage(tag string) string {
+	if msg, exists := validatorTagToMessage[tag]; exists {
+		return msg
+	}
+
+	return defaultValidationMessage
+}
+
+func buildPointerFromNamespace(namespace string) string {
+	parts := strings.Split(namespace, ".")
+
+	if len(parts) > 1 {
+		parts = parts[1:]
+	}
+
+	var pointer strings.Builder
+
+	for _, part := range parts {
+		pointer.WriteString("/")
+		pointer.WriteString(strings.ToLower(part))
+	}
+
+	return pointer.String()
 }
