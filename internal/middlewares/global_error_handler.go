@@ -9,7 +9,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/sirupsen/logrus"
 
-	"remy/internal/appErrors"
+	"remy/internal/domainErrors"
 	"remy/internal/logging"
 	"remy/internal/response"
 )
@@ -30,11 +30,11 @@ func GlobalErrorHandler() gin.HandlerFunc {
 			var apiErrors []*response.APIError
 
 			for _, err := range c.Errors {
-				var appErr *appErrors.AppError
+				var domainErr *domainErrors.DomainError
 				var validationErrs validator.ValidationErrors
 
-				if errors.As(err.Err, &appErr) {
-					apiErrors = append(apiErrors, mapAppErrorToAPIError(appErr))
+				if errors.As(err.Err, &domainErr) {
+					apiErrors = append(apiErrors, mapDomainErrorToAPIError(domainErr))
 				} else if errors.As(err.Err, &validationErrs) {
 					apiErrors = append(apiErrors, mapValidationErrorsToAPIErrors(validationErrs)...)
 				} else {
@@ -57,23 +57,22 @@ func GlobalErrorHandler() gin.HandlerFunc {
 func defaultErrorResponse() response.APIResponse {
 	return response.APIResponse{
 		Errors: []*response.APIError{
-			{
-				Status: http.StatusInternalServerError,
-				Code:   "internal_server_error",
-				Title:  "Internal Server Error",
-				Detail: "An unexpected error occurred. Please try again later.",
-			},
+			defaultError(),
 		},
 	}
 }
 
-func mapAppErrorToAPIError(appErr *appErrors.AppError) *response.APIError {
+func defaultError() *response.APIError {
 	return &response.APIError{
-		Status: appErr.Status,
-		Code:   appErr.Code,
-		Title:  http.StatusText(appErr.Status),
-		Detail: appErr.Message,
+		Status: http.StatusInternalServerError,
+		Code:   "internal_server_error",
+		Title:  "Internal Server Error",
+		Detail: "An unexpected error occurred. Please try again later.",
 	}
+}
+
+func mapDomainErrorToAPIError(domainErr *domainErrors.DomainError) *response.APIError {
+	return defaultError()
 }
 
 func mapValidationErrorsToAPIErrors(validationErrs validator.ValidationErrors) []*response.APIError {
