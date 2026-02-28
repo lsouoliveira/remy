@@ -43,6 +43,10 @@ func (n *Note) Review(quality int, algorithm SRSAlgorithm) error {
 	return nil
 }
 
+func NewSM2Algorithm() *SM2Algorithm {
+	return &SM2Algorithm{}
+}
+
 func (a *SM2Algorithm) CalculateNextReview(srsState *SRSState, quality int) (*SRSState, error) {
 	if quality < 0 || quality > 5 {
 		return nil, domainErrors.SRSState.InvalidQuality

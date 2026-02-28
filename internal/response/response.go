@@ -31,6 +31,15 @@ type Meta struct {
 	TotalItems int `json:"total_items"`
 }
 
+func NewAPIError(status int, code string, title string, detail string) *APIError {
+	return &APIError{
+		Status: status,
+		Code:   code,
+		Title:  title,
+		Detail: detail,
+	}
+}
+
 func NewPaginatedResponse(data any, page int, pageSize int, totalItems int) APIResponse {
 	var totalPages int
 

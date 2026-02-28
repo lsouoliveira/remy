@@ -37,6 +37,14 @@ var validatorTagToMessage = map[string]func(fieldErr validator.FieldError) strin
 	},
 }
 
+var domainErrorTitleMapping = map[string]string{
+	"srs_state.invalid_repetitions": "Invalid Repetitions",
+	"srs_state.invalid_interval":    "Invalid Interval",
+	"srs_state.invalid_ease_factor": "Invalid Ease Factor",
+	"srs_state.invalid_quality":     "Invalid Quality",
+	"not_found":                     "Resource Not Found",
+}
+
 func GlobalErrorHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
@@ -90,7 +98,7 @@ func defaultError() *response.APIError {
 }
 
 func mapDomainErrorToAPIError(domainErr *domainErrors.DomainError) *response.APIError {
-	return defaultError()
+	return envelopeDomainError(domainErr)
 }
 
 func mapValidationErrorsToAPIErrors(validationErrs validator.ValidationErrors) []*response.APIError {
@@ -152,4 +160,18 @@ func buildPointerFromNamespace(namespace string) string {
 	}
 
 	return pointer.String()
+}
+
+func envelopeDomainError(domainErr *domainErrors.DomainError) *response.APIError {
+	title, exists := domainErrorTitleMapping[domainErr.Code]
+	if !exists {
+		title = "Error"
+	}
+
+	return &response.APIError{
+		Status: http.StatusBadRequest,
+		Code:   domainErr.Code,
+		Title:  title,
+		Detail: domainErr.Message,
+	}
 }

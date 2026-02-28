@@ -6,6 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"remy/internal/domainErrors"
 	"remy/internal/models"
 )
 
@@ -38,6 +39,11 @@ type ListNotesParams struct {
 	Order    string
 }
 
+type ReviewParams struct {
+	NoteID  uint
+	Quality int
+}
+
 func NewNoteService(db *gorm.DB, publisher models.DomainEventPublisher) *NoteService {
 	return &NoteService{db: db, publisher: publisher}
 }
@@ -60,6 +66,30 @@ func (s *NoteService) Create(request NoteCreate) (*NoteRead, error) {
 	tx.Commit()
 
 	return mapToNoteRead(note), nil
+}
+
+func (s *NoteService) Review(reviewParams ReviewParams) error {
+	tx := s.db.Begin()
+
+	var note models.Note
+	if err := tx.First(&note, reviewParams.NoteID).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("note not found: %w", err)
+	}
+
+	if err := note.Review(reviewParams.Quality, models.NewSM2Algorithm()); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err := tx.Save(&note).Error; err != nil {
+		tx.Rollback()
+		return domainErrors.NotFoundError("Note", reviewParams.NoteID)
+	}
+
+	tx.Commit()
+
+	return nil
 }
 
 func (s *NoteService) List(params ListNotesParams) (*NoteList, error) {

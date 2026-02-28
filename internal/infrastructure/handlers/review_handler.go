@@ -12,49 +12,54 @@ import (
 	"remy/internal/services"
 )
 
-type NoteHandler struct {
+type ReviewHandler struct {
 	service *services.NoteService
 }
 
-type CreateNoteRequest struct {
-	Content *string `json:"content" binding:"required,min=1"`
+type ReviewRequest struct {
+	Quality int `json:"quality" binding:"required,min=1,max=5"`
 }
 
-type NoteListRequest struct {
+type ReviewListRequest struct {
 	Page     string `form:"page" binding:"omitempty,min=1"`
 	PageSize string `form:"page_size" binding:"omitempty,min=1,max=100"`
 	SortBy   string `form:"sort_by" binding:"omitempty,oneof=created_at updated_at review_at"`
 	Order    string `form:"order" binding:"omitempty,oneof=asc desc"`
 }
 
-func NewNoteHandler(service *services.NoteService) *NoteHandler {
-	return &NoteHandler{
+func NewReviewHandler(service *services.NoteService) *ReviewHandler {
+	return &ReviewHandler{
 		service: service,
 	}
 }
 
-func (h *NoteHandler) Create(c *gin.Context) {
-	var req CreateNoteRequest
+func (h *ReviewHandler) Create(c *gin.Context) {
+	var req ReviewRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.Error(err)
 		return
 	}
 
-	note, err := h.service.Create(services.NoteCreate{
-		Content: *req.Content,
+	var noteID uint
+	if err := c.ShouldBindUri(&noteID); err != nil {
+		c.Error(err)
+		return
+	}
+
+	err := h.service.Review(services.ReviewParams{
+		NoteID:  noteID,
+		Quality: req.Quality,
 	})
 	if err != nil {
 		c.Error(err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, response.APIResponse{
-		Data: note,
-	})
+	c.Status(http.StatusNoContent)
 }
 
-func (h *NoteHandler) List(c *gin.Context) {
-	var req NoteListRequest
+func (h *ReviewHandler) List(c *gin.Context) {
+	var req ReviewListRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		if validationErrs, ok := err.(validator.ValidationErrors); ok {
 			c.Error(infraErrors.NewQueryValidationError(validationErrs))
@@ -68,7 +73,7 @@ func (h *NoteHandler) List(c *gin.Context) {
 	params := services.ListNotesParams{
 		Page:     helpers.GetPageParam(c),
 		PageSize: helpers.GetPageSizeParam(c),
-		SortBy:   c.DefaultQuery("sort_by", "created_at"),
+		SortBy:   c.DefaultQuery("sort_by", "review_at"),
 		Order:    c.DefaultQuery("order", "asc"),
 	}
 
