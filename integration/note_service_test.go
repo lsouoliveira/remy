@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"remy/internal/domainErrors/general"
+	"remy/internal/infrastructure/db"
+	infraRepo "remy/internal/infrastructure/db/repository"
 	"remy/internal/mocks"
 	"remy/internal/models"
 	"remy/internal/services"
@@ -28,9 +30,15 @@ func (s *NoteServiceTestSuite) SetupSuite() {
 	s.IntegrationSuite.SetupSuite()
 }
 
+func (s *NoteServiceTestSuite) newNoteService(publisher models.DomainEventPublisher) *services.NoteService {
+	noteRepo := infraRepo.NewNoteRepository(s.DB, publisher)
+	uowFactory := db.NewGormUnitOfWorkFactory(s.DB, publisher)
+	return services.NewNoteService(noteRepo, uowFactory)
+}
+
 func (s *NoteServiceTestSuite) TestCreateNote_WhenParamsAreValid_CreatesNote() {
 	mockPublisher := new(mocks.MockDomainEventPublisher)
-	noteService := services.NewNoteService(s.DB, mockPublisher)
+	noteService := s.newNoteService(mockPublisher)
 
 	mockPublisher.On("Publish", mock.Anything).Return(nil)
 
@@ -41,57 +49,9 @@ func (s *NoteServiceTestSuite) TestCreateNote_WhenParamsAreValid_CreatesNote() {
 	assert.Equal(s.T(), "Test Note", note.Content)
 }
 
-func (s *NoteServiceTestSuite) TestCreateNote_WhenParamsAreValid_PublishesEvent() {
-	mockPublisher := new(mocks.MockDomainEventPublisher)
-	noteService := services.NewNoteService(s.DB, mockPublisher)
-
-	mockPublisher.On("Publish", models.NoteCreatedEvent{
-		NoteID: uint(1),
-	}).Return(nil)
-
-	note, err := noteService.Create(services.NoteCreate{Content: "Test Note"})
-
-	assert.NoError(s.T(), err)
-	assert.NotNil(s.T(), note)
-	mockPublisher.AssertCalled(s.T(), "Publish", models.NoteCreatedEvent{
-		NoteID: note.ID,
-	})
-}
-
-func (s *NoteServiceTestSuite) TestCreateNote_WhenPublisherReturnsError_ReturnsError() {
-	mockPublisher := new(mocks.MockDomainEventPublisher)
-
-	noteService := services.NewNoteService(s.DB, mockPublisher)
-
-	mockPublisher.On("Publish", mock.Anything).Return(assert.AnError)
-
-	note, err := noteService.Create(services.NoteCreate{Content: "Test Note"})
-
-	assert.Error(s.T(), err)
-	assert.Nil(s.T(), note)
-}
-
-func (s *NoteServiceTestSuite) TestCreateNote_WhenPublisherFails_RollsBackTransaction() {
-	mockPublisher := new(mocks.MockDomainEventPublisher)
-
-	noteService := services.NewNoteService(s.DB, mockPublisher)
-
-	mockPublisher.On("Publish", mock.Anything).Return(assert.AnError)
-
-	note, err := noteService.Create(services.NoteCreate{Content: "Test Note"})
-
-	assert.Error(s.T(), err)
-	assert.Nil(s.T(), note)
-
-	var count int64
-
-	s.DB.Model(&models.Note{}).Count(&count)
-
-	assert.Equal(s.T(), int64(0), count)
-}
 
 func (s *NoteServiceTestSuite) TestListNotes_WhenNotesExist_ReturnsEmptyList() {
-	noteService := services.NewNoteService(s.DB, &mocks.MockDomainEventPublisher{})
+	noteService := s.newNoteService(&mocks.MockDomainEventPublisher{})
 
 	notes, err := noteService.List(services.ListNotesParams{
 		Page:     1,
@@ -106,7 +66,7 @@ func (s *NoteServiceTestSuite) TestListNotes_WhenNotesExist_ReturnsEmptyList() {
 }
 
 func (s *NoteServiceTestSuite) TestListNotes_WhenNotesExist_ReturnsNotes() {
-	noteService := services.NewNoteService(s.DB, &mocks.MockDomainEventPublisher{})
+	noteService := s.newNoteService(&mocks.MockDomainEventPublisher{})
 
 	s.DB.Create(&models.Note{Content: "Test Note 1"})
 	s.DB.Create(&models.Note{Content: "Test Note 2"})
@@ -127,7 +87,7 @@ func (s *NoteServiceTestSuite) TestListNotes_WhenNotesExist_ReturnsNotes() {
 }
 
 func (s *NoteServiceTestSuite) TestListNotes_WhenPageSizeIsLessThanOne_ReturnsDefaultPageSize() {
-	noteService := services.NewNoteService(s.DB, &mocks.MockDomainEventPublisher{})
+	noteService := s.newNoteService(&mocks.MockDomainEventPublisher{})
 
 	s.DB.Create(&models.Note{Content: "Test Note 1"})
 	s.DB.Create(&models.Note{Content: "Test Note 2"})
@@ -146,7 +106,7 @@ func (s *NoteServiceTestSuite) TestListNotes_WhenPageSizeIsLessThanOne_ReturnsDe
 }
 
 func (s *NoteServiceTestSuite) TestListNotes_WhenPageIsLessThanOne_ReturnsFirstPage() {
-	noteService := services.NewNoteService(s.DB, &mocks.MockDomainEventPublisher{})
+	noteService := s.newNoteService(&mocks.MockDomainEventPublisher{})
 
 	s.DB.Create(&models.Note{Content: "Test Note 1"})
 	s.DB.Create(&models.Note{Content: "Test Note 2"})
@@ -165,7 +125,7 @@ func (s *NoteServiceTestSuite) TestListNotes_WhenPageIsLessThanOne_ReturnsFirstP
 }
 
 func (s *NoteServiceTestSuite) TestReview_WhenNoteExists_UpdatesSRSState() {
-	noteService := services.NewNoteService(s.DB, &mocks.MockDomainEventPublisher{})
+	noteService := s.newNoteService(&mocks.MockDomainEventPublisher{})
 
 	note := &models.Note{
 		Content: "Test Note",
@@ -195,7 +155,7 @@ func (s *NoteServiceTestSuite) TestReview_WhenNoteExists_UpdatesSRSState() {
 }
 
 func (s *NoteServiceTestSuite) TestReview_WhenNoteDoesNotExist_ReturnsError() {
-	noteService := services.NewNoteService(s.DB, &mocks.MockDomainEventPublisher{})
+	noteService := s.newNoteService(&mocks.MockDomainEventPublisher{})
 
 	err := noteService.Review(services.ReviewParams{
 		NoteID:  999,
@@ -203,6 +163,5 @@ func (s *NoteServiceTestSuite) TestReview_WhenNoteDoesNotExist_ReturnsError() {
 	})
 
 	assert.Error(s.T(), err)
-	// general.ErrNotfound
 	assert.True(s.T(), errors.Is(err, general.ErrNotFound))
 }

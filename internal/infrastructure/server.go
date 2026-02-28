@@ -13,6 +13,8 @@ import (
 	"gorm.io/gorm"
 
 	"remy/internal/config"
+	infraDB "remy/internal/infrastructure/db"
+	"remy/internal/infrastructure/db/repository"
 	"remy/internal/infrastructure/handlers"
 	pubpkg "remy/internal/infrastructure/publisher"
 	"remy/internal/logging"
@@ -110,7 +112,9 @@ func SetupRoutes(router *gin.Engine, db *gorm.DB) {
 
 	publisher := pubpkg.NewInMemoryPublisher()
 
-	noteService := services.NewNoteService(db, publisher)
+	noteRepo := repository.NewNoteRepository(db, publisher)
+	uowFactory := infraDB.NewGormUnitOfWorkFactory(db, publisher)
+	noteService := services.NewNoteService(noteRepo, uowFactory)
 	noteHandler := handlers.NewNoteHandler(noteService)
 
 	v1.POST("/notes", noteHandler.Create)

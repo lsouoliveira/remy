@@ -38,30 +38,37 @@ var validatorTagToMessage = map[string]func(fieldErr validator.FieldError) strin
 }
 
 type ErrorMeta struct {
-	Status  int
-	Message string
+	Status int
+	Title  string
+}
+
+var infraErrorMapping = map[string]ErrorMeta{
+	"infra.version_conflict": {
+		Status: http.StatusConflict,
+		Title:  "Version Conflict",
+	},
 }
 
 var domainErrorMapping = map[string]ErrorMeta{
 	"srs.invalid_repetitions": {
-		Status:  http.StatusBadRequest,
-		Message: "Repetitions must be non-negative",
+		Status: http.StatusBadRequest,
+		Title:  "Invalid Repetitions",
 	},
 	"srs.invalid_interval": {
-		Status:  http.StatusBadRequest,
-		Message: "Interval must be non-negative",
+		Status: http.StatusBadRequest,
+		Title:  "Invalid Interval",
 	},
 	"srs.invalid_ease_factor": {
-		Status:  http.StatusBadRequest,
-		Message: "Ease factor must be at least 1.3",
+		Status: http.StatusBadRequest,
+		Title:  "Invalid Ease Factor",
 	},
 	"srs.invalid_quality": {
-		Status:  http.StatusBadRequest,
-		Message: "Quality must be between 0 and 5",
+		Status: http.StatusBadRequest,
+		Title:  "Invalid Quality",
 	},
 	"general.not_found": {
-		Status:  http.StatusNotFound,
-		Message: "Note not found",
+		Status: http.StatusNotFound,
+		Title:  "Resource Not Found",
 	},
 }
 
@@ -76,11 +83,14 @@ func GlobalErrorHandler() gin.HandlerFunc {
 				var domainErr *domainErrors.DomainError
 				var validationErrs validator.ValidationErrors
 				var queryValidationErr *infraErrors.QueryValidationError
+				var infraErr *infraErrors.InfrastructureError
 
 				if errors.As(err.Err, &domainErr) {
 					apiErrors = append(apiErrors, mapDomainErrorToAPIError(domainErr))
 				} else if errors.As(err.Err, &queryValidationErr) {
 					apiErrors = append(apiErrors, mapQueryValidationErrorToAPIError(queryValidationErr)...)
+				} else if errors.As(err.Err, &infraErr) {
+					apiErrors = append(apiErrors, mapInfraErrorToAPIError(infraErr))
 				} else if errors.As(err.Err, &validationErrs) {
 					apiErrors = append(apiErrors, mapValidationErrorsToAPIErrors(validationErrs)...)
 				} else {
@@ -119,6 +129,20 @@ func defaultError() *response.APIError {
 
 func mapDomainErrorToAPIError(domainErr *domainErrors.DomainError) *response.APIError {
 	return envelopeDomainError(domainErr)
+}
+
+func mapInfraErrorToAPIError(infraErr *infraErrors.InfrastructureError) *response.APIError {
+	meta, exists := infraErrorMapping[infraErr.Code]
+	if !exists {
+		return defaultError()
+	}
+
+	return &response.APIError{
+		Status: meta.Status,
+		Code:   infraErr.Code,
+		Title:  meta.Title,
+		Detail: strings.ToUpper(infraErr.Message[:1]) + infraErr.Message[1:],
+	}
 }
 
 func mapValidationErrorsToAPIErrors(validationErrs validator.ValidationErrors) []*response.APIError {
@@ -183,18 +207,16 @@ func buildPointerFromNamespace(namespace string) string {
 }
 
 func envelopeDomainError(domainErr *domainErrors.DomainError) *response.APIError {
-	var status int
-	var title string
+	meta, exists := domainErrorMapping[domainErr.Code]
 
-	if meta, exists := domainErrorMapping[domainErr.Code]; exists {
-		status = meta.Status
-		title = strings.Title(strings.ReplaceAll(domainErr.Code, "_", " "))
+	if !exists {
+		return defaultError()
 	}
 
 	return &response.APIError{
-		Status: status,
+		Status: meta.Status,
 		Code:   domainErr.Code,
-		Title:  title,
+		Title:  meta.Title,
 		Detail: strings.ToUpper(domainErr.Message[:1]) + domainErr.Message[1:],
 	}
 }

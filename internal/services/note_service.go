@@ -4,15 +4,14 @@ import (
 	"fmt"
 	"time"
 
-	"gorm.io/gorm"
-
-	"remy/internal/domainErrors/general"
 	"remy/internal/models"
+	"remy/internal/repository"
+	"remy/internal/unit_of_work"
 )
 
 type NoteService struct {
-	db        *gorm.DB
-	publisher models.DomainEventPublisher
+	repo       repository.NoteRepository
+	uowFactory unit_of_work.UnitOfWorkFactory
 }
 
 type NoteCreate struct {
@@ -44,71 +43,63 @@ type ReviewParams struct {
 	Quality int
 }
 
-func NewNoteService(db *gorm.DB, publisher models.DomainEventPublisher) *NoteService {
-	return &NoteService{db: db, publisher: publisher}
+func NewNoteService(repo repository.NoteRepository, uowFactory unit_of_work.UnitOfWorkFactory) *NoteService {
+	return &NoteService{repo: repo, uowFactory: uowFactory}
 }
 
 func (s *NoteService) Create(request NoteCreate) (*NoteRead, error) {
-	tx := s.db.Begin()
+	uow := s.uowFactory.New()
+	defer uow.Rollback()
 
 	note := models.CreateNote(request.Content)
 
-	if err := tx.Create(note).Error; err != nil {
-		tx.Rollback()
+	if err := uow.Notes().Save(note); err != nil {
 		return nil, fmt.Errorf("failed to create note: %w", err)
 	}
 
-	if err := s.publisher.Publish(models.NoteCreatedEvent{NoteID: note.ID}); err != nil {
-		tx.Rollback()
-		return nil, fmt.Errorf("failed to publish note created event: %w", err)
+	if err := uow.Commit(); err != nil {
+		return nil, err
 	}
-
-	tx.Commit()
 
 	return mapToNoteRead(note), nil
 }
 
 func (s *NoteService) Review(reviewParams ReviewParams) error {
-	tx := s.db.Begin()
+	uow := s.uowFactory.New()
+	defer uow.Rollback()
 
-	var note models.Note
-	if err := tx.First(&note, reviewParams.NoteID).Error; err != nil {
-		tx.Rollback()
-		return general.NotFound("note", reviewParams.NoteID)
-	}
+	notes := uow.Notes()
 
-	if err := note.Review(reviewParams.Quality, models.NewSM2Algorithm()); err != nil {
-		tx.Rollback()
+	note, err := notes.GetByID(reviewParams.NoteID)
+	if err != nil {
 		return err
 	}
 
-	if err := tx.Save(&note).Error; err != nil {
-		tx.Rollback()
-		return fmt.Errorf("failed to save reviewed note: %w", err)
+	if err := note.Review(reviewParams.Quality, models.NewSM2Algorithm()); err != nil {
+		return err
 	}
 
-	tx.Commit()
+	if err := notes.Save(note); err != nil {
+		return err
+	}
 
-	return nil
+	return uow.Commit()
 }
 
 func (s *NoteService) List(params ListNotesParams) (*NoteList, error) {
-	var total int64
-	if err := s.db.Model(&models.Note{}).Count(&total).Error; err != nil {
-		return nil, fmt.Errorf("failed to count notes: %w", err)
-	}
-
-	var notes []models.Note
-	if err := s.db.Order(fmt.Sprintf("%s %s", params.SortBy, params.Order)).
-		Limit(params.PageSize).
-		Offset((params.Page - 1) * params.PageSize).
-		Find(&notes).Error; err != nil {
-		return nil, fmt.Errorf("failed to list notes: %w", err)
+	notes, total, err := s.repo.List(repository.ListParams{
+		Page:     params.Page,
+		PageSize: params.PageSize,
+		SortBy:   params.SortBy,
+		Order:    params.Order,
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	noteReads := make([]NoteRead, len(notes))
 	for i, note := range notes {
-		noteReads[i] = *mapToNoteRead(&note)
+		noteReads[i] = *mapToNoteRead(note)
 	}
 
 	return &NoteList{

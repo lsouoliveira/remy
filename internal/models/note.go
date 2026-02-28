@@ -13,6 +13,7 @@ type SRSAlgorithm interface {
 type SM2Algorithm struct{}
 
 type Note struct {
+	AggregateRoot
 	ID        uint      `gorm:"primaryKey"`
 	Content   string    `gorm:"type:text;not null"`
 	SRSState  SRSState  `gorm:"embedded"`

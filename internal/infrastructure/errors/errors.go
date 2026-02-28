@@ -9,12 +9,10 @@ import (
 type InfrastructureError struct {
 	Code    string
 	Message string
+	cause   error
 }
 
-type QueryValidationError struct {
-	InfrastructureError
-	OriginalError validator.ValidationErrors
-}
+var ErrVersionConflict = NewInfrastructureError("infra.version_conflict", "the resource was modified by another request.")
 
 func NewInfrastructureError(code string, message string) *InfrastructureError {
 	return &InfrastructureError{
@@ -23,8 +21,47 @@ func NewInfrastructureError(code string, message string) *InfrastructureError {
 	}
 }
 
+func WrapInfrastructureError(err error, code string, message string) *InfrastructureError {
+	return &InfrastructureError{
+		Code:    code,
+		Message: message,
+		cause:   err,
+	}
+}
+
+func (e *InfrastructureError) Unwrap() error {
+	return e.cause
+}
+
 func (e *InfrastructureError) Error() string {
+	if e.cause != nil {
+		return fmt.Sprintf("%s: %s - caused by: %v", e.Code, e.Message, e.cause)
+	}
+
 	return fmt.Sprintf("%s: %s", e.Code, e.Message)
+}
+
+func (e *InfrastructureError) Is(target error) bool {
+	if targetErr, ok := target.(*InfrastructureError); ok {
+		return e.Code == targetErr.Code
+	}
+
+	return false
+}
+
+func (e *InfrastructureError) As(target any) bool {
+	if targetErr, ok := target.(**InfrastructureError); ok {
+		*targetErr = e
+
+		return true
+	}
+
+	return false
+}
+
+type QueryValidationError struct {
+	InfrastructureError
+	OriginalError validator.ValidationErrors
 }
 
 func NewQueryValidationError(originalError validator.ValidationErrors) *QueryValidationError {
