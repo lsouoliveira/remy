@@ -112,3 +112,11 @@ func (s *NoteHandlerTestSuite) TestListNotes_WhenPageSizeIsInvalid_ReturnsDefaul
 
 	assert.Equal(s.T(), http.StatusOK, w.Code)
 }
+
+func (s *NoteHandlerTestSuite) TestListNotes_WhenSortIsInvalid_ReturnsBadRequest() {
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/notes?sort_by=invalid", nil)
+	w := httptest.NewRecorder()
+	s.Engine.ServeHTTP(w, req)
+
+	assert.Equal(s.T(), http.StatusBadRequest, w.Code)
+}

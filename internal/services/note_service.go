@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -18,10 +19,11 @@ type NoteCreate struct {
 }
 
 type NoteRead struct {
-	ID        uint   `json:"id"`
-	Content   string `json:"content"`
-	CreatedAt int64  `json:"created_at"`
-	UpdatedAt int64  `json:"updated_at"`
+	ID        uint      `json:"id"`
+	Content   string    `json:"content"`
+	ReviewAt  time.Time `json:"review_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type NoteList struct {
@@ -32,21 +34,8 @@ type NoteList struct {
 type ListNotesParams struct {
 	Page     int
 	PageSize int
-}
-
-func NewListNotesRequest(page int, pageSize int) ListNotesParams {
-	if page < 1 {
-		page = 1
-	}
-
-	if pageSize < 1 {
-		pageSize = 10
-	}
-
-	return ListNotesParams{
-		Page:     page,
-		PageSize: pageSize,
-	}
+	SortBy   string
+	Order    string
 }
 
 func NewNoteService(db *gorm.DB, publisher models.DomainEventPublisher) *NoteService {
@@ -80,7 +69,7 @@ func (s *NoteService) List(params ListNotesParams) (*NoteList, error) {
 	}
 
 	var notes []models.Note
-	if err := s.db.Order("created_at desc").
+	if err := s.db.Order(fmt.Sprintf("%s %s", params.SortBy, params.Order)).
 		Limit(params.PageSize).
 		Offset((params.Page - 1) * params.PageSize).
 		Find(&notes).Error; err != nil {
@@ -102,6 +91,7 @@ func mapToNoteRead(note *models.Note) *NoteRead {
 	return &NoteRead{
 		ID:        note.ID,
 		Content:   note.Content,
+		ReviewAt:  note.SRSState.ReviewAt,
 		CreatedAt: note.CreatedAt,
 		UpdatedAt: note.UpdatedAt,
 	}

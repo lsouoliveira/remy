@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -10,16 +11,30 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"remy/internal/domainErrors"
+	infraErrors "remy/internal/infrastructure/errors"
 	"remy/internal/logging"
 	"remy/internal/response"
 )
 
 var defaultValidationMessage = "Invalid value."
 
-var validatorTagToMessage = map[string]string{
-	"required": "This field is required.",
-	"min":      "Value is too short.",
-	"max":      "Value is too long.",
+var validatorTagToMessage = map[string]func(fieldErr validator.FieldError) string{
+	"required": func(fieldErr validator.FieldError) string {
+		return "This field is required."
+	},
+	"min": func(fieldErr validator.FieldError) string {
+		param := fieldErr.Param()
+		return "Value must be at least " + param + " characters long."
+	},
+	"max": func(fieldErr validator.FieldError) string {
+		param := fieldErr.Param()
+		return "Value must be at most " + param + " characters long."
+	},
+	"oneof": func(fieldErr validator.FieldError) string {
+		param := fieldErr.Param()
+		options := strings.Split(param, " ")
+		return "Value must be one of the following: " + strings.Join(options, ", ") + "."
+	},
 }
 
 func GlobalErrorHandler() gin.HandlerFunc {
@@ -32,9 +47,12 @@ func GlobalErrorHandler() gin.HandlerFunc {
 			for _, err := range c.Errors {
 				var domainErr *domainErrors.DomainError
 				var validationErrs validator.ValidationErrors
+				var queryValidationErr *infraErrors.QueryValidationError
 
 				if errors.As(err.Err, &domainErr) {
 					apiErrors = append(apiErrors, mapDomainErrorToAPIError(domainErr))
+				} else if errors.As(err.Err, &queryValidationErr) {
+					apiErrors = append(apiErrors, mapQueryValidationErrorToAPIError(queryValidationErr)...)
 				} else if errors.As(err.Err, &validationErrs) {
 					apiErrors = append(apiErrors, mapValidationErrorsToAPIErrors(validationErrs)...)
 				} else {
@@ -82,8 +100,8 @@ func mapValidationErrorsToAPIErrors(validationErrs validator.ValidationErrors) [
 		apiErrors = append(apiErrors, &response.APIError{
 			Status: http.StatusBadRequest,
 			Code:   "validation_error",
-			Title:  "Validation Error",
-			Detail: mapValidationTagToMessage(fieldErr.Tag()),
+			Title:  fmt.Sprintf("Validation failed for field '%s'", fieldErr.Field()),
+			Detail: mapValidationTagToMessage(fieldErr),
 			Source: &response.Source{
 				Pointer: buildPointerFromNamespace(fieldErr.Namespace()),
 			},
@@ -93,9 +111,27 @@ func mapValidationErrorsToAPIErrors(validationErrs validator.ValidationErrors) [
 	return apiErrors
 }
 
-func mapValidationTagToMessage(tag string) string {
-	if msg, exists := validatorTagToMessage[tag]; exists {
-		return msg
+func mapQueryValidationErrorToAPIError(queryValidationErr *infraErrors.QueryValidationError) []*response.APIError {
+	var apiErrors []*response.APIError
+
+	for _, fieldErr := range queryValidationErr.OriginalError {
+		apiErrors = append(apiErrors, &response.APIError{
+			Status: http.StatusBadRequest,
+			Code:   "validation_error",
+			Title:  fmt.Sprintf("Validation failed for query parameter '%s'", fieldErr.Field()),
+			Detail: mapValidationTagToMessage(fieldErr),
+			Source: &response.Source{
+				Parameter: fieldErr.Field(),
+			},
+		})
+	}
+
+	return apiErrors
+}
+
+func mapValidationTagToMessage(fieldErr validator.FieldError) string {
+	if msgFunc, exists := validatorTagToMessage[fieldErr.Tag()]; exists {
+		return msgFunc(fieldErr)
 	}
 
 	return defaultValidationMessage

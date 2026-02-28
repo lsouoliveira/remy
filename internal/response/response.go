@@ -19,8 +19,9 @@ type APIError struct {
 }
 
 type Source struct {
-	Pointer string `json:"pointer,omitempty"`
-	Param   string `json:"param,omitempty"`
+	Pointer   string `json:"pointer,omitempty"`
+	Parameter string `json:"parameter,omitempty"`
+	Header    string `json:"header,omitempty"`
 }
 
 type Meta struct {
