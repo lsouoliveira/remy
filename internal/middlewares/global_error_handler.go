@@ -37,12 +37,32 @@ var validatorTagToMessage = map[string]func(fieldErr validator.FieldError) strin
 	},
 }
 
-var domainErrorTitleMapping = map[string]string{
-	"srs_state.invalid_repetitions": "Invalid Repetitions",
-	"srs_state.invalid_interval":    "Invalid Interval",
-	"srs_state.invalid_ease_factor": "Invalid Ease Factor",
-	"srs_state.invalid_quality":     "Invalid Quality",
-	"not_found":                     "Resource Not Found",
+type ErrorMeta struct {
+	Status  int
+	Message string
+}
+
+var domainErrorMapping = map[string]ErrorMeta{
+	"srs.invalid_repetitions": {
+		Status:  http.StatusBadRequest,
+		Message: "Repetitions must be non-negative",
+	},
+	"srs.invalid_interval": {
+		Status:  http.StatusBadRequest,
+		Message: "Interval must be non-negative",
+	},
+	"srs.invalid_ease_factor": {
+		Status:  http.StatusBadRequest,
+		Message: "Ease factor must be at least 1.3",
+	},
+	"srs.invalid_quality": {
+		Status:  http.StatusBadRequest,
+		Message: "Quality must be between 0 and 5",
+	},
+	"general.not_found": {
+		Status:  http.StatusNotFound,
+		Message: "Note not found",
+	},
 }
 
 func GlobalErrorHandler() gin.HandlerFunc {
@@ -163,15 +183,18 @@ func buildPointerFromNamespace(namespace string) string {
 }
 
 func envelopeDomainError(domainErr *domainErrors.DomainError) *response.APIError {
-	title, exists := domainErrorTitleMapping[domainErr.Code]
-	if !exists {
-		title = "Error"
+	var status int
+	var title string
+
+	if meta, exists := domainErrorMapping[domainErr.Code]; exists {
+		status = meta.Status
+		title = strings.Title(strings.ReplaceAll(domainErr.Code, "_", " "))
 	}
 
 	return &response.APIError{
-		Status: http.StatusBadRequest,
+		Status: status,
 		Code:   domainErr.Code,
 		Title:  title,
-		Detail: domainErr.Message,
+		Detail: strings.ToUpper(domainErr.Message[:1]) + domainErr.Message[1:],
 	}
 }

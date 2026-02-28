@@ -2,7 +2,10 @@ package testhelpers
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/suite"
@@ -57,6 +60,15 @@ func (s *IntegrationSuite) TearDownSuite() {
 		s.T().Fatalf("Failed to get database connection: %v", err)
 	}
 	sqlDB.Close()
+}
+
+func (s *IntegrationSuite) Post(url string, body string) *httptest.ResponseRecorder {
+	req, _ := http.NewRequest(http.MethodPost, url, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	s.Engine.ServeHTTP(w, req)
+
+	return w
 }
 
 func clearDatabase(db *gorm.DB) {

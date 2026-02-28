@@ -115,4 +115,6 @@ func SetupRoutes(router *gin.Engine, db *gorm.DB) {
 
 	v1.POST("/notes", noteHandler.Create)
 	v1.GET("/notes", noteHandler.List)
+	v1.POST("/notes/:id/review", handlers.NewReviewHandler(noteService).Create)
+	v1.GET("/notes/queue", handlers.NewReviewHandler(noteService).List)
 }

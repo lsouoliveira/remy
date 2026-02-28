@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	"remy/internal/domainErrors"
+	"remy/internal/domainErrors/srs"
 )
 
 type SRSAlgorithm interface {
@@ -49,7 +49,7 @@ func NewSM2Algorithm() *SM2Algorithm {
 
 func (a *SM2Algorithm) CalculateNextReview(srsState *SRSState, quality int) (*SRSState, error) {
 	if quality < 0 || quality > 5 {
-		return nil, domainErrors.SRSState.InvalidQuality
+		return nil, srs.ErrInvalidQuality
 	}
 
 	var newRepetitions int

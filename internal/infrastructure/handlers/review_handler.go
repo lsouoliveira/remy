@@ -40,11 +40,7 @@ func (h *ReviewHandler) Create(c *gin.Context) {
 		return
 	}
 
-	var noteID uint
-	if err := c.ShouldBindUri(&noteID); err != nil {
-		c.Error(err)
-		return
-	}
+	noteID := uint(helpers.ParseInt(c.Param("id"), 0))
 
 	err := h.service.Review(services.ReviewParams{
 		NoteID:  noteID,

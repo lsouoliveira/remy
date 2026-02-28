@@ -7,31 +7,50 @@ import (
 type DomainError struct {
 	Code    string
 	Message string
+	cause   error
 }
 
-var SRSState = struct {
-	InvalidRepetitions *DomainError
-	InvalidInterval    *DomainError
-	InvalidEaseFactor  *DomainError
-	InvalidQuality     *DomainError
-}{
-	InvalidRepetitions: NewError("srs_state.invalid_repetitions", "Repetitions must be non-negative"),
-	InvalidInterval:    NewError("srs_state.invalid_interval", "Interval must be non-negative"),
-	InvalidEaseFactor:  NewError("srs_state.invalid_ease_factor", "Ease factor must be at least 1.3"),
-	InvalidQuality:     NewError("srs_state.invalid_quality", "Quality must be between 0 and 5"),
+func WrapError(err error, code string, message string) *DomainError {
+	return &DomainError{
+		Code:    code,
+		Message: message,
+		cause:   err,
+	}
 }
 
-var NotFoundError = func(entity string, id any) *DomainError {
-	return NewError("not_found", fmt.Sprintf("%s with ID %v not found", entity, id))
+func (e *DomainError) Unwrap() error {
+	return e.cause
 }
 
-func NewError(code string, message string) *DomainError {
+func (e *DomainError) Error() string {
+	if e.cause != nil {
+		return fmt.Sprintf("%s: %s - caused by: %v", e.Code, e.Message, e.cause)
+	}
+
+	return fmt.Sprintf("%s: %s", e.Code, e.Message)
+}
+
+func (e *DomainError) Is(target error) bool {
+	if targetErr, ok := target.(*DomainError); ok {
+		return e.Code == targetErr.Code
+	}
+
+	return false
+}
+
+func (e *DomainError) As(target any) bool {
+	if targetErr, ok := target.(**DomainError); ok {
+		*targetErr = e
+
+		return true
+	}
+
+	return false
+}
+
+func New(code string, message string) *DomainError {
 	return &DomainError{
 		Code:    code,
 		Message: message,
 	}
-}
-
-func (e *DomainError) Error() string {
-	return fmt.Sprintf("%s: %s", e.Code, e.Message)
 }

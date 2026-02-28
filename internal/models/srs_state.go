@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	"remy/internal/domainErrors"
+	"remy/internal/domainErrors/srs"
 )
 
 type SRSState struct {
@@ -15,15 +15,15 @@ type SRSState struct {
 
 func NewSRSState(repetitions int, interval int, easeFactor float64, reviewAt time.Time) (*SRSState, error) {
 	if repetitions < 0 {
-		return nil, domainErrors.SRSState.InvalidRepetitions
+		return nil, srs.ErrInvalidRepetitions
 	}
 
 	if interval < 0 {
-		return nil, domainErrors.SRSState.InvalidInterval
+		return nil, srs.ErrInvalidInterval
 	}
 
 	if easeFactor < 1.3 {
-		return nil, domainErrors.SRSState.InvalidEaseFactor
+		return nil, srs.ErrInvalidEaseFactor
 	}
 
 	return &SRSState{

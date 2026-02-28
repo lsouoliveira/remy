@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"remy/internal/domainErrors"
+	"remy/internal/domainErrors/general"
 	"remy/internal/models"
 )
 
@@ -74,7 +74,7 @@ func (s *NoteService) Review(reviewParams ReviewParams) error {
 	var note models.Note
 	if err := tx.First(&note, reviewParams.NoteID).Error; err != nil {
 		tx.Rollback()
-		return fmt.Errorf("note not found: %w", err)
+		return general.NotFound("note", reviewParams.NoteID)
 	}
 
 	if err := note.Review(reviewParams.Quality, models.NewSM2Algorithm()); err != nil {
@@ -84,7 +84,7 @@ func (s *NoteService) Review(reviewParams ReviewParams) error {
 
 	if err := tx.Save(&note).Error; err != nil {
 		tx.Rollback()
-		return domainErrors.NotFoundError("Note", reviewParams.NoteID)
+		return fmt.Errorf("failed to save reviewed note: %w", err)
 	}
 
 	tx.Commit()

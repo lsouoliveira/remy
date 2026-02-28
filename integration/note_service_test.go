@@ -1,12 +1,15 @@
 package integration
 
 import (
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
+	"remy/internal/domainErrors/general"
 	"remy/internal/mocks"
 	"remy/internal/models"
 	"remy/internal/services"
@@ -93,8 +96,7 @@ func (s *NoteServiceTestSuite) TestListNotes_WhenNotesExist_ReturnsEmptyList() {
 	notes, err := noteService.List(services.ListNotesParams{
 		Page:     1,
 		PageSize: 10,
-		SortBy:   "created_at",
-		Order:    "asc",
+		SortBy:   "created_at", Order: "asc",
 	})
 
 	assert.NoError(s.T(), err)
@@ -160,4 +162,47 @@ func (s *NoteServiceTestSuite) TestListNotes_WhenPageIsLessThanOne_ReturnsFirstP
 	assert.NotNil(s.T(), notes)
 	assert.Equal(s.T(), 2, len(notes.Notes))
 	assert.Equal(s.T(), int64(2), notes.Total)
+}
+
+func (s *NoteServiceTestSuite) TestReview_WhenNoteExists_UpdatesSRSState() {
+	noteService := services.NewNoteService(s.DB, &mocks.MockDomainEventPublisher{})
+
+	note := &models.Note{
+		Content: "Test Note",
+		SRSState: models.SRSState{
+			Repetitions: 0,
+			Interval:    0,
+			EaseFactor:  2.5,
+			ReviewAt:    time.Now(),
+		},
+	}
+
+	s.DB.Create(note)
+
+	err := noteService.Review(services.ReviewParams{
+		NoteID:  note.ID,
+		Quality: 4,
+	})
+
+	assert.NoError(s.T(), err)
+
+	var updatedNote models.Note
+	s.DB.First(&updatedNote, note.ID)
+
+	assert.Equal(s.T(), 1, updatedNote.SRSState.Repetitions)
+	assert.Equal(s.T(), 1, updatedNote.SRSState.Interval)
+	assert.InDelta(s.T(), 2.5, updatedNote.SRSState.EaseFactor, 0.01)
+}
+
+func (s *NoteServiceTestSuite) TestReview_WhenNoteDoesNotExist_ReturnsError() {
+	noteService := services.NewNoteService(s.DB, &mocks.MockDomainEventPublisher{})
+
+	err := noteService.Review(services.ReviewParams{
+		NoteID:  999,
+		Quality: 4,
+	})
+
+	assert.Error(s.T(), err)
+	// general.ErrNotfound
+	assert.True(s.T(), errors.Is(err, general.ErrNotFound))
 }
