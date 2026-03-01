@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 func GetPageParam(c *gin.Context) int {
@@ -33,4 +34,8 @@ func ParseInt(s string, defaultValue int) int {
 	}
 
 	return value
+}
+
+func ParseUUID(s string) (uuid.UUID, error) {
+	return uuid.Parse(s)
 }

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"remy/internal/models"
 	"remy/internal/repository"
 	"remy/internal/unit_of_work"
@@ -19,7 +21,7 @@ type NoteCreate struct {
 }
 
 type NoteRead struct {
-	ID        uint      `json:"id"`
+	ID        uuid.UUID `json:"id"`
 	Content   string    `json:"content"`
 	ReviewAt  time.Time `json:"review_at"`
 	CreatedAt time.Time `json:"created_at"`
@@ -39,7 +41,7 @@ type ListNotesParams struct {
 }
 
 type ReviewParams struct {
-	NoteID  uint
+	NoteID  uuid.UUID
 	Quality int
 }
 

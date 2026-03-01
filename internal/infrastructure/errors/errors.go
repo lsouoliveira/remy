@@ -14,6 +14,10 @@ type InfrastructureError struct {
 
 var ErrVersionConflict = NewInfrastructureError("infra.version_conflict", "the resource was modified by another request.")
 
+func InvalidPathParameter(param string) *InfrastructureError {
+	return NewInfrastructureError("infra.invalid_path_parameter", fmt.Sprintf("invalid path parameter: %s", param))
+}
+
 func NewInfrastructureError(code string, message string) *InfrastructureError {
 	return &InfrastructureError{
 		Code:    code,

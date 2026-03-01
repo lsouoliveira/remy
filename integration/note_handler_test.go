@@ -43,7 +43,6 @@ func (s *NoteHandlerTestSuite) TestCreateNote_WhenParamsAreValid_CreateNote() {
 	assert.NoError(s.T(), err)
 	assert.Equal(s.T(), http.StatusCreated, w.Code)
 	assert.Equal(s.T(), "Test note content", note.Content)
-	assert.Equal(s.T(), uint(1), note.ID)
 	assert.NotZero(s.T(), note.CreatedAt)
 	assert.NotZero(s.T(), note.UpdatedAt)
 }

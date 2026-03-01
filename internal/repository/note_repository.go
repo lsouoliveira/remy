@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"github.com/google/uuid"
+
 	"remy/internal/models"
 )
 
@@ -13,6 +15,6 @@ type ListParams struct {
 
 type NoteRepository interface {
 	Save(note *models.Note) error
-	GetByID(id uint) (*models.Note, error)
+	GetByID(id uuid.UUID) (*models.Note, error)
 	List(params ListParams) ([]*models.Note, int64, error)
 }

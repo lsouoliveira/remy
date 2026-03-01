@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -49,7 +50,6 @@ func (s *NoteServiceTestSuite) TestCreateNote_WhenParamsAreValid_CreatesNote() {
 	assert.Equal(s.T(), "Test Note", note.Content)
 }
 
-
 func (s *NoteServiceTestSuite) TestListNotes_WhenNotesExist_ReturnsEmptyList() {
 	noteService := s.newNoteService(&mocks.MockDomainEventPublisher{})
 
@@ -68,8 +68,8 @@ func (s *NoteServiceTestSuite) TestListNotes_WhenNotesExist_ReturnsEmptyList() {
 func (s *NoteServiceTestSuite) TestListNotes_WhenNotesExist_ReturnsNotes() {
 	noteService := s.newNoteService(&mocks.MockDomainEventPublisher{})
 
-	s.DB.Create(&models.Note{Content: "Test Note 1"})
-	s.DB.Create(&models.Note{Content: "Test Note 2"})
+	s.DB.Create(&models.Note{ID: uuid.New(), Content: "Test Note 1"})
+	s.DB.Create(&models.Note{ID: uuid.New(), Content: "Test Note 2"})
 
 	notes, err := noteService.List(services.ListNotesParams{
 		Page:     1,
@@ -89,8 +89,8 @@ func (s *NoteServiceTestSuite) TestListNotes_WhenNotesExist_ReturnsNotes() {
 func (s *NoteServiceTestSuite) TestListNotes_WhenPageSizeIsLessThanOne_ReturnsDefaultPageSize() {
 	noteService := s.newNoteService(&mocks.MockDomainEventPublisher{})
 
-	s.DB.Create(&models.Note{Content: "Test Note 1"})
-	s.DB.Create(&models.Note{Content: "Test Note 2"})
+	s.DB.Create(&models.Note{ID: uuid.New(), Content: "Test Note 1"})
+	s.DB.Create(&models.Note{ID: uuid.New(), Content: "Test Note 2"})
 
 	notes, err := noteService.List(services.ListNotesParams{
 		Page:     1,
@@ -108,8 +108,8 @@ func (s *NoteServiceTestSuite) TestListNotes_WhenPageSizeIsLessThanOne_ReturnsDe
 func (s *NoteServiceTestSuite) TestListNotes_WhenPageIsLessThanOne_ReturnsFirstPage() {
 	noteService := s.newNoteService(&mocks.MockDomainEventPublisher{})
 
-	s.DB.Create(&models.Note{Content: "Test Note 1"})
-	s.DB.Create(&models.Note{Content: "Test Note 2"})
+	s.DB.Create(&models.Note{ID: uuid.New(), Content: "Test Note 1"})
+	s.DB.Create(&models.Note{ID: uuid.New(), Content: "Test Note 2"})
 
 	notes, err := noteService.List(services.ListNotesParams{
 		Page:     0,
@@ -158,7 +158,7 @@ func (s *NoteServiceTestSuite) TestReview_WhenNoteDoesNotExist_ReturnsError() {
 	noteService := s.newNoteService(&mocks.MockDomainEventPublisher{})
 
 	err := noteService.Review(services.ReviewParams{
-		NoteID:  999,
+		NoteID:  uuid.New(),
 		Quality: 4,
 	})
 

@@ -1,12 +1,16 @@
 package models
 
+import (
+	"github.com/google/uuid"
+)
+
 type DomainEvent any
 
 type NoteCreatedEvent struct {
-	NoteID uint
+	NoteID uuid.UUID
 }
 
-func NewNoteCreatedEvent(noteID uint) *NoteCreatedEvent {
+func NewNoteCreatedEvent(noteID uuid.UUID) *NoteCreatedEvent {
 	return &NoteCreatedEvent{
 		NoteID: noteID,
 	}

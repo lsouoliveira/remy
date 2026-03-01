@@ -3,6 +3,7 @@ package repository
 import (
 	"fmt"
 
+	"github.com/google/uuid"
 	gormpkg "gorm.io/gorm"
 
 	"remy/internal/domainErrors/general"
@@ -21,12 +22,12 @@ func NewNoteRepository(db *gormpkg.DB, publisher models.DomainEventPublisher) re
 }
 
 func (r *NoteRepository) Save(note *models.Note) error {
-	if note.ID == 0 {
+	if note.IsNew {
 		if err := r.db.Create(note).Error; err != nil {
 			return fmt.Errorf("failed to create note: %w", err)
 		}
 	} else {
-		result := r.db.Model(note).Where("version = ?", note.Version-1).Save(note)
+		result := r.db.Model(note).Where("version = ?", note.Version-1).Updates(note)
 		if result.Error != nil {
 			return result.Error
 		}
@@ -45,7 +46,7 @@ func (r *NoteRepository) Save(note *models.Note) error {
 	return nil
 }
 
-func (r *NoteRepository) GetByID(id uint) (*models.Note, error) {
+func (r *NoteRepository) GetByID(id uuid.UUID) (*models.Note, error) {
 	var note models.Note
 	if err := r.db.First(&note, id).Error; err != nil {
 		return nil, general.NotFound("note", id)

@@ -3,6 +3,8 @@ package models
 import (
 	"time"
 
+	"github.com/google/uuid"
+
 	"remy/internal/domainErrors/srs"
 )
 
@@ -14,22 +16,32 @@ type SM2Algorithm struct{}
 
 type Note struct {
 	AggregateRoot
-	ID        uint      `gorm:"primaryKey"`
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
 	Content   string    `gorm:"type:text;not null"`
 	SRSState  SRSState  `gorm:"embedded"`
 	Version   uint      `gorm:"type:int;default:1"`
 	CreatedAt time.Time `gorm:"autoCreateTime"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime"`
+	IsNew     bool      `gorm:"-"`
 }
 
 func CreateNote(content string) *Note {
 	srsState, _ := NewSRSState(0, 0, 2.5, time.Now())
 
-	return &Note{
+	id := uuid.New()
+	note := Note{
+		ID:       id,
 		SRSState: *srsState,
 		Content:  content,
 		Version:  1,
+		IsNew:    true,
 	}
+
+	note.AddEvent(NoteCreatedEvent{
+		NoteID: id,
+	})
+
+	return &note
 }
 
 func (n *Note) Review(quality int, algorithm SRSAlgorithm) error {

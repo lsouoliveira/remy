@@ -82,10 +82,4 @@ func clearDatabase(db *gorm.DB) {
 			panic(fmt.Sprintf("Failed to clear table %s: %v", table, err))
 		}
 	}
-
-	for _, table := range tables {
-		if err := db.Exec(fmt.Sprintf("DELETE FROM sqlite_sequence WHERE name='%s'", table)).Error; err != nil {
-			panic(fmt.Sprintf("Failed to reset auto-increment for table %s: %v", table, err))
-		}
-	}
 }

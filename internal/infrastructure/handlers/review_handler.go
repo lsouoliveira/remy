@@ -40,9 +40,13 @@ func (h *ReviewHandler) Create(c *gin.Context) {
 		return
 	}
 
-	noteID := uint(helpers.ParseInt(c.Param("id"), 0))
+	noteID, err := helpers.ParseUUID(c.Param("id"))
+	if err != nil {
+		c.Error(infraErrors.InvalidPathParameter("id"))
+		return
+	}
 
-	err := h.service.Review(services.ReviewParams{
+	err = h.service.Review(services.ReviewParams{
 		NoteID:  noteID,
 		Quality: req.Quality,
 	})
