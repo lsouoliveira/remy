@@ -34,10 +34,10 @@ type NoteList struct {
 }
 
 type ListNotesParams struct {
-	Page     int
-	PageSize int
-	SortBy   string
-	Order    string
+	SortBy models.SortField
+	Order  models.SortOrder
+	Limit  int
+	Cursor *models.Cursor
 }
 
 type ReviewParams struct {
@@ -90,10 +90,10 @@ func (s *NoteService) Review(reviewParams ReviewParams) error {
 
 func (s *NoteService) List(params ListNotesParams) (*NoteList, error) {
 	notes, total, err := s.repo.List(repository.ListParams{
-		Page:     params.Page,
-		PageSize: params.PageSize,
-		SortBy:   params.SortBy,
-		Order:    params.Order,
+		SortBy: params.SortBy,
+		Order:  params.Order,
+		Limit:  params.Limit,
+		Cursor: params.Cursor,
 	})
 	if err != nil {
 		return nil, err

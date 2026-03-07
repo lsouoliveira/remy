@@ -1,6 +1,8 @@
 package helpers
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -38,4 +40,24 @@ func ParseInt(s string, defaultValue int) int {
 
 func ParseUUID(s string) (uuid.UUID, error) {
 	return uuid.Parse(s)
+}
+
+func DecodeCursor[T any](cursorStr string) (*T, error) {
+	if cursorStr == "" {
+		return nil, nil
+	}
+
+	decoded, err := base64.URLEncoding.DecodeString(cursorStr)
+	if err != nil {
+		return nil, err
+	}
+
+	var cursor T
+
+	err = json.Unmarshal(decoded, &cursor)
+	if err != nil {
+		return nil, err
+	}
+
+	return &cursor, nil
 }

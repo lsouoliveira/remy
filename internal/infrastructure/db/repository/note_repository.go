@@ -5,12 +5,28 @@ import (
 
 	"github.com/google/uuid"
 	gormpkg "gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"remy/internal/domainErrors/general"
 	infraErrors "remy/internal/infrastructure/errors"
 	"remy/internal/models"
 	"remy/internal/repository"
 )
+
+type paginationFilter struct {
+	sortBy    string
+	operator  string
+	isDesc    bool
+	value     any
+	id        uuid.UUID
+	hasCursor bool
+}
+
+var SortFieldMap = map[models.SortField]string{
+	models.SortByCreatedAt: "created_at",
+	models.SortByUpdatedAt: "updated_at",
+	models.SortByReviewAt:  "review_at",
+}
 
 type NoteRepository struct {
 	db        *gormpkg.DB
@@ -55,19 +71,84 @@ func (r *NoteRepository) GetByID(id uuid.UUID) (*models.Note, error) {
 	return &note, nil
 }
 
-func (r *NoteRepository) List(params repository.ListParams) ([]*models.Note, int64, error) {
-	var total int64
-	if err := r.db.Model(&models.Note{}).Count(&total).Error; err != nil {
-		return nil, 0, fmt.Errorf("failed to count notes: %w", err)
-	}
-
+func (r *NoteRepository) List(params repository.ListParams) ([]*models.Note, bool, error) {
 	var notes []*models.Note
-	if err := r.db.Order(fmt.Sprintf("%s %s", params.SortBy, params.Order)).
-		Limit(params.PageSize).
-		Offset((params.Page - 1) * params.PageSize).
-		Find(&notes).Error; err != nil {
-		return nil, 0, fmt.Errorf("failed to list notes: %w", err)
+	query := r.db.Model(&models.Note{})
+
+	filter, err := parseCursor(params.SortBy, params.Order, params.Cursor)
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to parse cursor: %w", err)
 	}
 
-	return notes, total, nil
+	if filter.hasCursor {
+		query = query.Where(clause.Expr{
+			SQL:  fmt.Sprintf("(%s, id) %s (?, ?)", filter.sortBy, filter.operator),
+			Vars: []any{filter.value, filter.id},
+		})
+	}
+
+	query = query.Order(clause.OrderBy{Columns: []clause.OrderByColumn{
+		{Column: clause.Column{Name: filter.sortBy}, Desc: filter.isDesc},
+		{Column: clause.Column{Name: "id"}, Desc: filter.isDesc},
+	}})
+
+	query = query.Limit(params.Limit + 1)
+
+	if err := query.Find(&notes).Error; err != nil {
+		return nil, false, fmt.Errorf("failed to list notes: %w", err)
+	}
+
+	hasNextPage := len(notes) > params.Limit
+	if hasNextPage {
+		notes = notes[:params.Limit]
+	}
+
+	return notes, hasNextPage, nil
+}
+
+func parseCursor(sortBy models.SortField, order models.SortOrder, cursor *models.Cursor) (*paginationFilter, error) {
+	filter := &paginationFilter{}
+
+	if cursor != nil {
+		sortBy = cursor.Field
+		order = cursor.Order
+		filter.hasCursor = true
+		filter.value = cursor.Value
+		filter.id = cursor.ID
+	}
+
+	sortByField, err := mapSortField(sortBy)
+	if err != nil {
+		return nil, err
+	}
+
+	operator, isDesc, err := mapSortOrder(order)
+	if err != nil {
+		return nil, err
+	}
+
+	filter.sortBy = sortByField
+	filter.isDesc = isDesc
+	filter.operator = operator
+
+	return filter, nil
+}
+
+func mapSortField(sortField models.SortField) (string, error) {
+	if field, ok := SortFieldMap[sortField]; ok {
+		return field, nil
+	}
+
+	return "", fmt.Errorf("unsupported sort field: %d", sortField)
+}
+
+func mapSortOrder(order models.SortOrder) (operator string, isDesc bool, err error) {
+	switch order {
+	case models.Asc:
+		return ">", false, nil
+	case models.Desc:
+		return "<", true, nil
+	default:
+		return "", false, fmt.Errorf("unsupported sort order: %d", order)
+	}
 }

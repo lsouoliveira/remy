@@ -1,6 +1,7 @@
 package response
 
 import (
+	"encoding/base64"
 	"math"
 )
 
@@ -25,10 +26,9 @@ type Source struct {
 }
 
 type Meta struct {
-	Page       int `json:"page"`
-	PageSize   int `json:"page_size"`
-	TotalPages int `json:"total_pages"`
-	TotalItems int `json:"total_items"`
+	NextCursor any `json:"next_cursor,omitempty"`
+	TotalItems int `json:"total_items,omitempty"`
+	TotalPages int `json:"total_pages,omitempty"`
 }
 
 func NewAPIError(status int, code string, title string, detail string) *APIError {
@@ -40,7 +40,7 @@ func NewAPIError(status int, code string, title string, detail string) *APIError
 	}
 }
 
-func NewPaginatedResponse(data any, page int, pageSize int, totalItems int) APIResponse {
+func NewPaginatedResponse(data any, cursor any, pageSize int, totalItems int) APIResponse {
 	var totalPages int
 
 	if pageSize > 0 {
@@ -50,10 +50,9 @@ func NewPaginatedResponse(data any, page int, pageSize int, totalItems int) APIR
 	return APIResponse{
 		Data: data,
 		Meta: &Meta{
-			Page:       page,
-			PageSize:   pageSize,
-			TotalPages: totalPages,
+			NextCursor: base64.StdEncoding.EncodeToString([]byte(cursor.(string))),
 			TotalItems: totalItems,
+			TotalPages: totalPages,
 		},
 	}
 }

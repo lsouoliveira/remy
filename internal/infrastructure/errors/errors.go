@@ -18,6 +18,10 @@ func InvalidPathParameter(param string) *InfrastructureError {
 	return NewInfrastructureError("infra.invalid_path_parameter", fmt.Sprintf("invalid path parameter: %s", param))
 }
 
+func InvalidCursorParameter() *InfrastructureError {
+	return NewInfrastructureError("infra.invalid_cursor_parameter", "invalid cursor parameter")
+}
+
 func NewInfrastructureError(code string, message string) *InfrastructureError {
 	return &InfrastructureError{
 		Code:    code,

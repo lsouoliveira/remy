@@ -27,6 +27,12 @@ type ReviewListRequest struct {
 	Order    string `form:"order" binding:"omitempty,oneof=asc desc"`
 }
 
+type ReviewListCursor struct {
+	ID     string `json:"id"`
+	SortBy string `json:"sort_value"`
+	Order  string `json:"order"`
+}
+
 func NewReviewHandler(service *services.NoteService) *ReviewHandler {
 	return &ReviewHandler{
 		service: service,
@@ -83,5 +89,21 @@ func (h *ReviewHandler) List(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, response.NewPaginatedResponse(result.Notes, params.Page, params.PageSize, int(result.Total)))
+	cursor := newReviewListCursor(result.Notes, params.SortBy, params.Order)
+
+	c.JSON(http.StatusOK, response.NewPaginatedResponse(result.Notes, cursor, int(result.Total), params.PageSize))
+}
+
+func newReviewListCursor(notes []services.NoteRead, sortBy string, order string) any {
+	if len(notes) == 0 {
+		return NoteListCursor{}
+	}
+
+	lastNote := notes[len(notes)-1]
+
+	return ReviewListCursor{
+		ID:     lastNote.ID.String(),
+		SortBy: sortBy,
+		Order:  order,
+	}
 }

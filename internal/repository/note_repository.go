@@ -7,10 +7,10 @@ import (
 )
 
 type ListParams struct {
-	Page     int
-	PageSize int
-	SortBy   string
-	Order    string
+	SortBy models.SortField
+	Order  models.SortOrder
+	Limit  int
+	Cursor *models.Cursor
 }
 
 type NoteRepository interface {
